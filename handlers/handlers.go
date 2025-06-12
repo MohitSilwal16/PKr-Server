@@ -121,11 +121,11 @@ func (s *CliServiceServer) RequestPunchFromReceiver(ctx context.Context, req *pb
 	for {
 		time.Sleep(10 * time.Second)
 		ws.NotifyToPunchResponseMap.Lock()
-		res, ok = ws.NotifyToPunchResponseMap.Map[req.WorkspaceOwnerUsername]
+		res, ok = ws.NotifyToPunchResponseMap.Map[req.WorkspaceOwnerUsername+req.ListenerUsername]
 		ws.NotifyToPunchResponseMap.Unlock()
 		if ok {
 			ws.NotifyToPunchResponseMap.Lock()
-			delete(ws.NotifyToPunchResponseMap.Map, req.WorkspaceOwnerUsername)
+			delete(ws.NotifyToPunchResponseMap.Map, req.WorkspaceOwnerUsername+req.ListenerUsername)
 			ws.NotifyToPunchResponseMap.Unlock()
 			break
 		}

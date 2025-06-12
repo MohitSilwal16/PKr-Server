@@ -11,6 +11,7 @@ type NotifyToPunchRequest struct {
 type NotifyToPunchResponse struct {
 	WorkspaceOwnerPublicIP   string `json:"workspace_owner_public_ip"`
 	WorkspaceOwnerPublicPort string `json:"workspace_owner_public_port"`
+	ListenerUsername         string `json:"listener_username"`
 }
 
 type NotifyNewPushToListeners struct {

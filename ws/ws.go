@@ -75,7 +75,7 @@ func readJSONMessage(conn *websocket.Conn, username string) {
 				continue
 			}
 			NotifyToPunchResponseMap.Lock()
-			NotifyToPunchResponseMap.Map[username] = res
+			NotifyToPunchResponseMap.Map[username+res.ListenerUsername] = res
 			NotifyToPunchResponseMap.Unlock()
 			log.Printf("Res: %#v", res)
 		}
