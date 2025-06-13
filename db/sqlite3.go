@@ -23,6 +23,7 @@ func createAllTables() error {
 	workspaceTableQuery := `CREATE TABLE IF NOT EXISTS workspaces (
 		username TEXT,
 		workspace_name TEXT,
+		last_hash TEXT,
 
 		PRIMARY KEY(username, workspace_name)
 	);`
@@ -56,7 +57,6 @@ func createAllTables() error {
 		log.Println("Source: createAllTables()")
 		return err
 	}
-
 	return nil
 }
 
@@ -76,13 +76,13 @@ func InsertDummyData() error {
 		return err
 	}
 
-	query = `INSERT INTO workspaces (username, workspace_name) VALUES
-				('user#123', 'WorkspaceA'),
-				('user#123', 'WorkspaceB'),
-				('user#456', 'WorkspaceC'),
-				('user#789', 'WorkspaceD'),
-				('user#101', 'WorkspaceE'),
-				('user#102', 'WorkspaceF');`
+	query = `INSERT INTO workspaces (username, workspace_name, last_hash) VALUES
+				('user#123', 'WorkspaceA', 'Hash1'),
+				('user#123', 'WorkspaceB', 'Hash12'),
+				('user#456', 'WorkspaceC', 'Hash13'),
+				('user#789', 'WorkspaceD', 'Hash14'),
+				('user#101', 'WorkspaceE', 'Hash15'),
+				('user#102', 'WorkspaceF', 'Hash16');`
 
 	_, err = db.Exec(query)
 	if err != nil {
@@ -182,7 +182,7 @@ func CheckIfWorkspaceExists(username, workspace_name string) (bool, error) {
 	return rows.Next(), nil
 }
 
-func RegisterNewWorkspace(username, password, workspace_name string) error {
+func RegisterNewWorkspace(username, password, workspace_name, last_hash string) error {
 	ifAuth, err := AuthUser(username, password)
 	if err != nil {
 		log.Println("Error:", err)
@@ -207,8 +207,8 @@ func RegisterNewWorkspace(username, password, workspace_name string) error {
 		return fmt.Errorf("workspace already exists")
 	}
 
-	query := "INSERT INTO workspaces (username, workspace_name) VALUES (?,?)"
-	if _, err = db.Exec(query, username, workspace_name); err != nil {
+	query := "INSERT INTO workspaces (username, workspace_name, last_hash) VALUES (?,?,?);"
+	if _, err = db.Exec(query, username, workspace_name, last_hash); err != nil {
 		log.Println("Error:", err)
 		log.Println("Description: Could Not Insert into workspaces Table")
 		log.Println("Source: RegisterNewWorkspace()")
@@ -296,4 +296,39 @@ func GetAllWorkspaces() ([]*pb.WorkspaceInfo, error) {
 	}
 
 	return workspaces, nil
+}
+
+func GetLastHashOfWorkspace(workspace_name, workspace_owner_name string) (string, error) {
+	query := "SELECT last_hash FROM workspaces WHERE username=? AND workspace_name=?;"
+
+	rows, err := db.Query(query, workspace_owner_name, workspace_name)
+	if err != nil {
+		log.Println("Error while Getting Lash Hash of Workspace:", err)
+		log.Println("Source: GetLastHashOfWorkspace()")
+		return "", err
+	}
+	defer rows.Close()
+
+	var last_hash string
+	if rows.Next() {
+		if err := rows.Scan(&last_hash); err != nil {
+			log.Println("Error while Scanning Lash Hash from Results:", err)
+			log.Println("Source: GetLastHashOfWorkspace()")
+			return "", err
+		}
+	}
+
+	return last_hash, nil
+}
+
+func UpdateLastHashOfWorkpace(workspace_name, workspace_owner_name, new_workspace_hash string) error {
+	query := "UPDATE workspaces SET last_hash=? WHERE username=? AND workspace_name=?;"
+
+	_, err := db.Exec(query, new_workspace_hash, workspace_owner_name, workspace_name)
+	if err != nil {
+		log.Println("Error while Updating Last Hash of Workspace:", err)
+		log.Println("Source: UpdateLastHashOfWorkpace()")
+		return err
+	}
+	return nil
 }

@@ -10,8 +10,8 @@ R:
 	@del server_database.db
 	go run .
 
-open_db:
+open-db:
 	@sqlite3 server_database.db
 
-grpc_out:
+grpc-out:
 	protoc ./proto/*.proto --go_out=. --go-grpc_out=.

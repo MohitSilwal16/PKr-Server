@@ -23,7 +23,7 @@ func (s *CliServiceServer) Register(ctx context.Context, req *pb.RegisterRequest
 	if err != nil {
 		log.Println("Error:", err)
 		log.Println("Description: Could Not Check whether a Username was already used or not")
-		log.Println("Source: CreateNewUser()")
+		log.Println("Source: Register()")
 		return nil, fmt.Errorf("internal server error")
 	}
 
@@ -35,7 +35,7 @@ func (s *CliServiceServer) Register(ctx context.Context, req *pb.RegisterRequest
 	if err != nil {
 		log.Println("Error:", err)
 		log.Println("Description: Could Not Create New User")
-		log.Println("Source: CreateNewUser()")
+		log.Println("Source: Register()")
 		return nil, fmt.Errorf("internal server error")
 	}
 
@@ -55,7 +55,7 @@ func (s *CliServiceServer) RegisterWorkspace(ctx context.Context, req *pb.Regist
 		return nil, fmt.Errorf("incorrect user credentials")
 	}
 
-	err = db.RegisterNewWorkspace(req.Username, req.Password, req.WorkspaceName)
+	err = db.RegisterNewWorkspace(req.Username, req.Password, req.WorkspaceName, req.LastHash)
 	if err == nil {
 		return &pb.RegisterWorkspaceResponse{}, nil
 	}
@@ -175,7 +175,7 @@ func (s *CliServiceServer) RegisterUserToWorkspace(ctx context.Context, req *pb.
 	does_workspace_exists, err := db.CheckIfWorkspaceExists(req.WorkspaceOwnerUsername, req.WorkspaceName)
 	if err != nil {
 		log.Println("Error:", err)
-		log.Println("Description: Could Not Authenticate User")
+		log.Println("Description: Could Not Check if Workspace Exists")
 		log.Println("Source: RegisterUserToWorkspace()")
 		return nil, fmt.Errorf("internal server error")
 	}
@@ -187,7 +187,7 @@ func (s *CliServiceServer) RegisterUserToWorkspace(ctx context.Context, req *pb.
 	does_workspace_connection_exists, err := db.CheckIfWorkspaceConnectionAlreadyExists(req.WorkspaceName, req.WorkspaceOwnerUsername, req.ListenerUsername)
 	if err != nil {
 		log.Println("Error:", err)
-		log.Println("Description: Could Not Authenticate User")
+		log.Println("Description: Could Not Check if Workspace Connection Already Exists")
 		log.Println("Source: RegisterUserToWorkspace()")
 		return nil, fmt.Errorf("internal server error")
 	}
@@ -212,7 +212,7 @@ func (s *CliServiceServer) NotifyNewPushToListeners(ctx context.Context, req *pb
 	if err != nil {
 		log.Println("Error:", err)
 		log.Println("Description: Could Not Authenticate User")
-		log.Println("Source: RegisterUserToWorkspace()")
+		log.Println("Source: NotifyNewPushToListeners()")
 		return nil, fmt.Errorf("internal server error")
 	}
 
@@ -223,8 +223,8 @@ func (s *CliServiceServer) NotifyNewPushToListeners(ctx context.Context, req *pb
 	does_workspace_exists, err := db.CheckIfWorkspaceExists(req.WorkspaceOwnerUsername, req.WorkspaceName)
 	if err != nil {
 		log.Println("Error:", err)
-		log.Println("Description: Could Not Authenticate User")
-		log.Println("Source: RegisterUserToWorkspace()")
+		log.Println("Description: Could Not Check if Workspace Already Exists")
+		log.Println("Source: NotifyNewPushToListeners()")
 		return nil, fmt.Errorf("internal server error")
 	}
 
@@ -232,11 +232,19 @@ func (s *CliServiceServer) NotifyNewPushToListeners(ctx context.Context, req *pb
 		return nil, fmt.Errorf("workspace doesn't exists")
 	}
 
+	err = db.UpdateLastHashOfWorkpace(req.WorkspaceName, req.WorkspaceOwnerUsername, req.NewWorkspaceHash)
+	if err != nil {
+		log.Println("Error:", err)
+		log.Println("Description: Could Not Update Last Hash of Workspace")
+		log.Println("Source: NotifyNewPushToListeners()")
+		return nil, fmt.Errorf("internal server error")
+	}
+
 	workspace_listeners, err := db.GetWorkspaceListeners(req.WorkspaceName, req.WorkspaceOwnerUsername)
 	if err != nil {
 		log.Println("Error:", err)
 		log.Println("Description: Could Not Get Workspace Listeners")
-		log.Println("Source: RegisterUserToWorkspace()")
+		log.Println("Source: NotifyNewPushToListeners()")
 		return nil, fmt.Errorf("internal server error")
 	}
 
@@ -267,7 +275,7 @@ func (s *CliServiceServer) GetAllWorkspaces(ctx context.Context, req *pb.GetAllW
 	if err != nil {
 		log.Println("Error:", err)
 		log.Println("Description: Could Not Authenticate User")
-		log.Println("Source: RegisterUserToWorkspace()")
+		log.Println("Source: GetAllWorkspaces()")
 		return nil, fmt.Errorf("internal server error")
 	}
 
@@ -284,4 +292,38 @@ func (s *CliServiceServer) GetAllWorkspaces(ctx context.Context, req *pb.GetAllW
 	}
 
 	return &pb.GetAllWorkspacesResponse{Workspaces: workspaces}, nil
+}
+
+func (s *CliServiceServer) GetLastHashOfWorkspace(ctx context.Context, req *pb.GetLastHashOfWorkspaceRequest) (*pb.GetLastHashOfWorkspaceResponse, error) {
+	is_user_authenticated, err := db.AuthUser(req.ListenerUsername, req.ListenerPassword)
+	if err != nil {
+		log.Println("Error:", err)
+		log.Println("Description: Could Not Authenticate User")
+		log.Println("Source: GetLastHashOfWorkspace()")
+		return nil, fmt.Errorf("internal server error")
+	}
+
+	if !is_user_authenticated {
+		return nil, fmt.Errorf("incorrect user credentials")
+	}
+
+	does_workspace_connection_exists, err := db.CheckIfWorkspaceConnectionAlreadyExists(req.WorkspaceName, req.WorkspaceOwner, req.ListenerUsername)
+	if err != nil {
+		log.Println("Error while checking if workspace connection already exists:", err)
+		log.Println("Source: GetLastHashOfWorkspace()")
+		return nil, fmt.Errorf("internal server error")
+	}
+	if !does_workspace_connection_exists {
+		log.Println("Error: Workspace Connection Doesn't Exists\nSource: GetLastHashOfWorkspace()")
+		return nil, fmt.Errorf("workspace connection doesn't exists")
+	}
+
+	last_hash, err := db.GetLastHashOfWorkspace(req.WorkspaceName, req.WorkspaceOwner)
+	if err != nil {
+		log.Println("Error while getting last hash of workspace:", err)
+		log.Println("Source: GetLastHashOfWorkspace()")
+		return nil, fmt.Errorf("internal server error")
+	}
+
+	return &pb.GetLastHashOfWorkspaceResponse{LastHash: last_hash}, nil
 }

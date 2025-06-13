@@ -26,6 +26,124 @@ var upgrader = websocket.Upgrader{
 
 var NotifyToPunchResponseMap = models.NotifyToPunchResponseMap{Map: map[string]models.NotifyToPunchResponse{}}
 
+func handleNotifyToPunchResponse(msg models.WSMessage, username string) {
+	msg_bytes, err := json.Marshal(msg.Message)
+	if err != nil {
+		log.Println("Error while marshaling:", err)
+		log.Println("Source: handleNotifyToPunchResponse()")
+		return
+	}
+	var msg_obj models.NotifyToPunchResponse
+	if err := json.Unmarshal(msg_bytes, &msg_obj); err != nil {
+		log.Println("Error while unmarshaling:", err)
+		log.Println("Source: handleNotifyToPunchResponse()")
+		return
+	}
+	NotifyToPunchResponseMap.Lock()
+	NotifyToPunchResponseMap.Map[username+msg_obj.ListenerUsername] = msg_obj
+	NotifyToPunchResponseMap.Unlock()
+	log.Printf("Noti To Punch Res: %#v", msg_obj)
+}
+
+func handleRequestPunchFromReceiverRequest(msg models.WSMessage, conn *websocket.Conn) {
+	msg_bytes, err := json.Marshal(msg.Message)
+	if err != nil {
+		log.Println("Error while marshaling:", err)
+		log.Println("Source: handleRequestPunchFromReceiverRequest()")
+		return
+	}
+	var msg_obj models.RequestPunchFromReceiverRequest
+	if err := json.Unmarshal(msg_bytes, &msg_obj); err != nil {
+		log.Println("Error while unmarshaling:", err)
+		log.Println("Source: handleRequestPunchFromReceiverRequest()")
+		return
+	}
+
+	var req_punch_from_receiver_response models.RequestPunchFromReceiverResponse
+
+	connManager.Lock()
+	workspace_owner_conn, ok := connManager.ConnPool[msg_obj.WorkspaceOwnerUsername]
+	connManager.Unlock()
+	if !ok {
+		// Workspace Owner is Offline
+		req_punch_from_receiver_response.Error = "Workspace Owner is Offline"
+
+		err = conn.WriteJSON(models.WSMessage{
+			MessageType: "RequestPunchFromReceiverResponse",
+			Message:     req_punch_from_receiver_response,
+		})
+		if err != nil {
+			log.Println("Error:", err)
+			log.Println("Description: Could Not Write Request Punch from Receiver's Response to", conn.RemoteAddr())
+			log.Println("Source: handleRequestPunchFromReceiverRequest()")
+			return
+		}
+		return
+	}
+	// Workspace Owner is Online
+
+	var noti_to_punch_req models.NotifyToPunchRequest
+	noti_to_punch_req.ListenerUsername = msg_obj.ListenerUsername
+	noti_to_punch_req.ListenerPublicIP = msg_obj.ListenerPublicIP
+	noti_to_punch_req.ListenerPublicPort = msg_obj.ListenerPublicPort
+
+	err = workspace_owner_conn.WriteJSON(models.WSMessage{
+		MessageType: "NotifyToPunchRequest",
+		Message:     noti_to_punch_req,
+	})
+	if err != nil {
+		log.Println("Error:", err)
+		log.Println("Description: Could Not Write Notify To Punch Req to", workspace_owner_conn.RemoteAddr())
+		log.Println("Source: handleRequestPunchFromReceiverRequest()")
+		return
+	}
+
+	fmt.Println("HELLO", msg_obj.WorkspaceOwnerUsername+msg_obj.ListenerUsername)
+
+	// TODO: Add Proper Timeout
+	var noti_to_punch_res models.NotifyToPunchResponse
+	var invalid_flag bool
+	count := 0
+	for {
+		time.Sleep(10 * time.Second)
+		NotifyToPunchResponseMap.Lock()
+		noti_to_punch_res, ok = NotifyToPunchResponseMap.Map[msg_obj.WorkspaceOwnerUsername+msg_obj.ListenerUsername]
+		fmt.Println(NotifyToPunchResponseMap.Map)
+		NotifyToPunchResponseMap.Unlock()
+		if ok {
+			NotifyToPunchResponseMap.Lock()
+			delete(NotifyToPunchResponseMap.Map, msg_obj.WorkspaceOwnerUsername+msg_obj.ListenerUsername)
+			NotifyToPunchResponseMap.Unlock()
+			break
+		}
+		if count == 6 {
+			invalid_flag = true
+			break
+		}
+		count += 1
+	}
+
+	if invalid_flag {
+		log.Println("Error: Workspace Owner isn't Responding\nSource: handleRequestPunchFromReceiverRequest()")
+		req_punch_from_receiver_response.Error = "Workspace Owner isn't Responding"
+	} else {
+		req_punch_from_receiver_response.WorkspaceOwnerPublicIP = noti_to_punch_res.WorkspaceOwnerPublicIP
+		req_punch_from_receiver_response.WorkspaceOwnerPublicPort = noti_to_punch_res.WorkspaceOwnerPublicPort
+		req_punch_from_receiver_response.WorkspaceOwnerUsername = msg_obj.WorkspaceOwnerUsername
+	}
+
+	err = conn.WriteJSON(models.WSMessage{
+		MessageType: "RequestPunchFromReceiverResponse",
+		Message:     req_punch_from_receiver_response,
+	})
+	if err != nil {
+		log.Println("Error:", err)
+		log.Println("Description: Could Not Write Notify To Punch Res to", conn.RemoteAddr())
+		log.Println("Source: handleRequestPunchFromReceiverRequest()")
+		return
+	}
+}
+
 func readJSONMessage(conn *websocket.Conn, username string) {
 	defer removeUserFromConnPool(conn, username)
 
@@ -62,22 +180,11 @@ func readJSONMessage(conn *websocket.Conn, username string) {
 		log.Printf("Message: %#v", msg)
 
 		if msg.MessageType == "NotifyToPunchResponse" {
-			res_json, err := json.Marshal(msg.Message)
-			if err != nil {
-				log.Println("Error while marshaling:", err)
-				log.Println("Source: readJSONMessage()")
-				continue
-			}
-			var res models.NotifyToPunchResponse
-			if err := json.Unmarshal(res_json, &res); err != nil {
-				log.Println("Error while unmarshaling:", err)
-				log.Println("Source: readJSONMessage()")
-				continue
-			}
-			NotifyToPunchResponseMap.Lock()
-			NotifyToPunchResponseMap.Map[username+res.ListenerUsername] = res
-			NotifyToPunchResponseMap.Unlock()
-			log.Printf("Res: %#v", res)
+			log.Println("NotifyToPunchResponse Called")
+			handleNotifyToPunchResponse(msg, username)
+		} else if msg.MessageType == "RequestPunchFromReceiverRequest" {
+			log.Println("RequestPunchFromReceiverRequest Called from WS")
+			handleRequestPunchFromReceiverRequest(msg, conn)
 		}
 	}
 }

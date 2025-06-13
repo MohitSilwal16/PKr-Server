@@ -25,6 +25,7 @@ const (
 	CliService_RequestPunchFromReceiver_FullMethodName = "/proto.CliService/RequestPunchFromReceiver"
 	CliService_NotifyNewPushToListeners_FullMethodName = "/proto.CliService/NotifyNewPushToListeners"
 	CliService_GetAllWorkspaces_FullMethodName         = "/proto.CliService/GetAllWorkspaces"
+	CliService_GetLastHashOfWorkspace_FullMethodName   = "/proto.CliService/GetLastHashOfWorkspace"
 )
 
 // CliServiceClient is the client API for CliService service.
@@ -37,6 +38,7 @@ type CliServiceClient interface {
 	RequestPunchFromReceiver(ctx context.Context, in *RequestPunchFromReceiverRequest, opts ...grpc.CallOption) (*RequestPunchFromReceiverResponse, error)
 	NotifyNewPushToListeners(ctx context.Context, in *NotifyNewPushToListenersRequest, opts ...grpc.CallOption) (*NotifyNewPushToListenersResponse, error)
 	GetAllWorkspaces(ctx context.Context, in *GetAllWorkspacesRequest, opts ...grpc.CallOption) (*GetAllWorkspacesResponse, error)
+	GetLastHashOfWorkspace(ctx context.Context, in *GetLastHashOfWorkspaceRequest, opts ...grpc.CallOption) (*GetLastHashOfWorkspaceResponse, error)
 }
 
 type cliServiceClient struct {
@@ -107,6 +109,16 @@ func (c *cliServiceClient) GetAllWorkspaces(ctx context.Context, in *GetAllWorks
 	return out, nil
 }
 
+func (c *cliServiceClient) GetLastHashOfWorkspace(ctx context.Context, in *GetLastHashOfWorkspaceRequest, opts ...grpc.CallOption) (*GetLastHashOfWorkspaceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetLastHashOfWorkspaceResponse)
+	err := c.cc.Invoke(ctx, CliService_GetLastHashOfWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CliServiceServer is the server API for CliService service.
 // All implementations must embed UnimplementedCliServiceServer
 // for forward compatibility.
@@ -117,6 +129,7 @@ type CliServiceServer interface {
 	RequestPunchFromReceiver(context.Context, *RequestPunchFromReceiverRequest) (*RequestPunchFromReceiverResponse, error)
 	NotifyNewPushToListeners(context.Context, *NotifyNewPushToListenersRequest) (*NotifyNewPushToListenersResponse, error)
 	GetAllWorkspaces(context.Context, *GetAllWorkspacesRequest) (*GetAllWorkspacesResponse, error)
+	GetLastHashOfWorkspace(context.Context, *GetLastHashOfWorkspaceRequest) (*GetLastHashOfWorkspaceResponse, error)
 	mustEmbedUnimplementedCliServiceServer()
 }
 
@@ -144,6 +157,9 @@ func (UnimplementedCliServiceServer) NotifyNewPushToListeners(context.Context, *
 }
 func (UnimplementedCliServiceServer) GetAllWorkspaces(context.Context, *GetAllWorkspacesRequest) (*GetAllWorkspacesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllWorkspaces not implemented")
+}
+func (UnimplementedCliServiceServer) GetLastHashOfWorkspace(context.Context, *GetLastHashOfWorkspaceRequest) (*GetLastHashOfWorkspaceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLastHashOfWorkspace not implemented")
 }
 func (UnimplementedCliServiceServer) mustEmbedUnimplementedCliServiceServer() {}
 func (UnimplementedCliServiceServer) testEmbeddedByValue()                    {}
@@ -274,6 +290,24 @@ func _CliService_GetAllWorkspaces_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CliService_GetLastHashOfWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLastHashOfWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CliServiceServer).GetLastHashOfWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CliService_GetLastHashOfWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CliServiceServer).GetLastHashOfWorkspace(ctx, req.(*GetLastHashOfWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CliService_ServiceDesc is the grpc.ServiceDesc for CliService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +338,10 @@ var CliService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAllWorkspaces",
 			Handler:    _CliService_GetAllWorkspaces_Handler,
+		},
+		{
+			MethodName: "GetLastHashOfWorkspace",
+			Handler:    _CliService_GetLastHashOfWorkspace_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

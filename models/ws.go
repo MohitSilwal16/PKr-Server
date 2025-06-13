@@ -17,7 +17,6 @@ type ConnManager struct {
 }
 
 type WSMessage struct {
-	User        User
 	MessageType string // Error, NotifyToPunchResponse
 	Message     any
 }
